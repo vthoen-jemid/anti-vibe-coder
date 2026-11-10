@@ -218,10 +218,32 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
 
+  // Show/hide the blue→pink colours. The choice is remembered across sessions and
+  // drives the eye button in the editor title bar (like "Collapse Unchanged Regions").
+  const COLORS_KEY = 'antiVibe.decorationsEnabled';
+  const applyColors = (on: boolean) => {
+    painter.setEnabled(on);
+    void context.globalState.update(COLORS_KEY, on);
+    void vscode.commands.executeCommand('setContext', COLORS_KEY, on);
+  };
+  applyColors(context.globalState.get<boolean>(COLORS_KEY, true));
   reg('antiVibe.toggleDecorations', () => {
-    const on = painter.toggle();
-    vscode.window.setStatusBarMessage(`Anti-Vibe Coder colours ${on ? 'on' : 'off'}`, 2000);
+    applyColors(!painter.isEnabled);
+    vscode.window.setStatusBarMessage(`Anti-Vibe Coder colours ${painter.isEnabled ? 'on' : 'off'}`, 2000);
   });
+  reg('antiVibe.hideDecorations', () => applyColors(false));
+  reg('antiVibe.showDecorations', () => applyColors(true));
+
+  // Only show the title-bar button on files that are part of the branch diff.
+  const updateActiveContext = () => {
+    const doc = vscode.window.activeTextEditor?.document;
+    const tracked = !!doc && !!t.getDocState(doc)?.isNew.includes(1);
+    void vscode.commands.executeCommand('setContext', 'antiVibe.activeFileTracked', tracked);
+  };
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(updateActiveContext),
+    t.onDidChange(updateActiveContext),
+  );
 
   void t.refresh();
 }

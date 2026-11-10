@@ -109,6 +109,18 @@
         "title": "Open Settings",
         "category": "Anti-Vibe Coder",
         "icon": "$(gear)"
+      },
+      {
+        "command": "antiVibe.hideDecorations",
+        "title": "Hide Review Colors",
+        "category": "Anti-Vibe Coder",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "antiVibe.showDecorations",
+        "title": "Show Review Colors",
+        "category": "Anti-Vibe Coder",
+        "icon": "$(eye-closed)"
       }
     ],
     "menus": {
@@ -122,11 +134,6 @@
           "command": "antiVibe.nextUnreviewed",
           "when": "view == antiVibe.changes",
           "group": "navigation@2"
-        },
-        {
-          "command": "antiVibe.toggleDecorations",
-          "when": "view == antiVibe.changes",
-          "group": "navigation@3"
         },
         {
           "command": "antiVibe.refresh",
@@ -144,6 +151,16 @@
         {
           "command": "antiVibe.openSettings",
           "when": "view == antiVibe.changes"
+        },
+        {
+          "command": "antiVibe.hideDecorations",
+          "when": "view == antiVibe.changes && antiVibe.decorationsEnabled",
+          "group": "navigation@3"
+        },
+        {
+          "command": "antiVibe.showDecorations",
+          "when": "view == antiVibe.changes && !antiVibe.decorationsEnabled",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -171,6 +188,26 @@
         {
           "command": "antiVibe.openDiff",
           "when": "false"
+        },
+        {
+          "command": "antiVibe.hideDecorations",
+          "when": "antiVibe.decorationsEnabled"
+        },
+        {
+          "command": "antiVibe.showDecorations",
+          "when": "!antiVibe.decorationsEnabled"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "antiVibe.hideDecorations",
+          "when": "antiVibe.decorationsEnabled && antiVibe.activeFileTracked",
+          "group": "navigation@100"
+        },
+        {
+          "command": "antiVibe.showDecorations",
+          "when": "!antiVibe.decorationsEnabled && antiVibe.activeFileTracked",
+          "group": "navigation@100"
         }
       ]
     },
@@ -186,6 +223,11 @@
         "key": "ctrl+alt+r",
         "mac": "cmd+alt+r",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "antiVibe.toggleDecorations",
+        "key": "ctrl+alt+h",
+        "mac": "cmd+alt+h"
       }
     ],
     "configuration": {

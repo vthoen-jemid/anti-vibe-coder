@@ -28,9 +28,13 @@ export class DecorationPainter implements vscode.Disposable {
     return this.enabled;
   }
 
-  toggle(): boolean {
-    this.enabled = !this.enabled;
+  setEnabled(on: boolean): void {
+    this.enabled = on;
     this.paintAll();
+  }
+
+  toggle(): boolean {
+    this.setEnabled(!this.enabled);
     return this.enabled;
   }
 

@@ -19,6 +19,7 @@ AI assistants write a lot of code quickly. Reviewing it is the hard part: after 
 - **Settings panel**: a collapsible block at the bottom of the sidebar with a slider for each signal, so you can tune how much each one counts.
 - **Open All Branch Changes**: one multi-file diff of the whole branch against its base.
 - **Go to Next Unreviewed Line** (`Ctrl+Alt+N` / `Cmd+Alt+N`): jumps to the next blue line, across files.
+- **Show/Hide Review Colors**: eye button in the editor title bar (top right, also in Source Control diffs) or `Ctrl+Alt+H` / `Cmd+Alt+H`. Tracking keeps running while the colours are hidden, and the choice is remembered.
 - **Mark Selection as Reviewed** (`Ctrl+Alt+R` / `Cmd+Alt+R`) for code you've checked by other means.
 - **Status bar** showing progress for the whole branch, e.g. `👁 42% reviewed`.
 
@@ -101,4 +102,4 @@ Issues and pull requests are welcome. Please run `npm test` and `npm run typeche
 
 ## License
 
-[MIT](LICENSE)
+MIT — see the `LICENSE` file.
