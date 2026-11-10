@@ -1,0 +1,317 @@
+{
+  "name": "anti-vibe-coder",
+  "displayName": "Anti-Vibe Coder",
+  "description": "Review your whole branch against main and see which new code you have actually looked at: unseen lines are blue, reviewed lines turn pink.",
+  "version": "0.1.0",
+  "publisher": "jem-id",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "review",
+    "git",
+    "diff",
+    "branch",
+    "ai"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "antiVibe",
+          "title": "Anti-Vibe Coder",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "antiVibe": [
+        {
+          "id": "antiVibe.changes",
+          "name": "Overview"
+        },
+        {
+          "id": "antiVibe.settings",
+          "name": "Settings",
+          "type": "webview",
+          "visibility": "collapsed"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "antiVibe.refresh",
+        "title": "Refresh",
+        "category": "Anti-Vibe Coder",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "antiVibe.openAllChanges",
+        "title": "Open All Branch Changes",
+        "category": "Anti-Vibe Coder",
+        "icon": "$(diff-multiple)"
+      },
+      {
+        "command": "antiVibe.openDiff",
+        "title": "Open Diff with Base",
+        "category": "Anti-Vibe Coder",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "antiVibe.nextUnreviewed",
+        "title": "Go to Next Unreviewed Line",
+        "category": "Anti-Vibe Coder",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "antiVibe.markReviewed",
+        "title": "Mark Selection as Reviewed",
+        "category": "Anti-Vibe Coder"
+      },
+      {
+        "command": "antiVibe.markUnreviewed",
+        "title": "Mark Selection as Unreviewed",
+        "category": "Anti-Vibe Coder"
+      },
+      {
+        "command": "antiVibe.resetFile",
+        "title": "Reset Review Progress for File",
+        "category": "Anti-Vibe Coder"
+      },
+      {
+        "command": "antiVibe.resetBranch",
+        "title": "Reset Review Progress for Branch",
+        "category": "Anti-Vibe Coder"
+      },
+      {
+        "command": "antiVibe.selectBaseBranch",
+        "title": "Select Base Branch",
+        "category": "Anti-Vibe Coder"
+      },
+      {
+        "command": "antiVibe.toggleDecorations",
+        "title": "Toggle Review Colors",
+        "category": "Anti-Vibe Coder",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "antiVibe.openSettings",
+        "title": "Open Settings",
+        "category": "Anti-Vibe Coder",
+        "icon": "$(gear)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "antiVibe.openAllChanges",
+          "when": "view == antiVibe.changes",
+          "group": "navigation@1"
+        },
+        {
+          "command": "antiVibe.nextUnreviewed",
+          "when": "view == antiVibe.changes",
+          "group": "navigation@2"
+        },
+        {
+          "command": "antiVibe.toggleDecorations",
+          "when": "view == antiVibe.changes",
+          "group": "navigation@3"
+        },
+        {
+          "command": "antiVibe.refresh",
+          "when": "view == antiVibe.changes",
+          "group": "navigation@4"
+        },
+        {
+          "command": "antiVibe.selectBaseBranch",
+          "when": "view == antiVibe.changes"
+        },
+        {
+          "command": "antiVibe.resetBranch",
+          "when": "view == antiVibe.changes"
+        },
+        {
+          "command": "antiVibe.openSettings",
+          "when": "view == antiVibe.changes"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "antiVibe.openDiff",
+          "when": "view == antiVibe.changes && viewItem == antiVibeFile",
+          "group": "inline"
+        },
+        {
+          "command": "antiVibe.resetFile",
+          "when": "view == antiVibe.changes && viewItem == antiVibeFile"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "antiVibe.markReviewed",
+          "group": "antiVibe@1"
+        },
+        {
+          "command": "antiVibe.markUnreviewed",
+          "group": "antiVibe@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "antiVibe.openDiff",
+          "when": "false"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "antiVibe.nextUnreviewed",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n",
+        "when": "editorTextFocus || focusedView == antiVibe.changes"
+      },
+      {
+        "command": "antiVibe.markReviewed",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
+        "when": "editorTextFocus"
+      }
+    ],
+    "configuration": {
+      "title": "Anti-Vibe Coder",
+      "properties": {
+        "antiVibe.baseBranch": {
+          "type": "string",
+          "default": "",
+          "description": "Branch to compare against. Empty = auto-detect (origin/HEAD, then main, then master)."
+        },
+        "antiVibe.signals.viewport.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Count time that lines are visible on screen as reviewing."
+        },
+        "antiVibe.signals.viewport.weight": {
+          "type": "number",
+          "default": 0.03,
+          "minimum": 0,
+          "description": "Score per second a line gains while visible (1.0 = fully reviewed). Damped when many lines are visible."
+        },
+        "antiVibe.signals.cursor.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Count time the cursor/selection is on a line as reviewing."
+        },
+        "antiVibe.signals.cursor.weight": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0,
+          "description": "Score per second for the cursor line when nothing is selected (neighbouring lines get half)."
+        },
+        "antiVibe.signals.selection.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Count time that code is selected as reviewing."
+        },
+        "antiVibe.signals.selection.weight": {
+          "type": "number",
+          "default": 0.1,
+          "minimum": 0,
+          "description": "Score per second for every selected line."
+        },
+        "antiVibe.signals.hover.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Count mouse hovers over code as reviewing."
+        },
+        "antiVibe.signals.hover.weight": {
+          "type": "number",
+          "default": 0.15,
+          "minimum": 0,
+          "description": "Score per hover event on a line."
+        },
+        "antiVibe.signals.typing.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Lines you type yourself keep their progress and count as reviewed."
+        },
+        "antiVibe.signals.typing.weight": {
+          "type": "number",
+          "default": 0.25,
+          "minimum": 0,
+          "description": "Score per keystroke-sized edit on a line."
+        },
+        "antiVibe.signals.typing.maxChars": {
+          "type": "number",
+          "default": 80,
+          "minimum": 1,
+          "description": "Edits larger than this many characters (pastes, AI insertions) are not treated as your own typing."
+        },
+        "antiVibe.idleTimeoutSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 5,
+          "description": "Stop counting viewport time after this many seconds without any activity."
+        },
+        "antiVibe.reviewedThreshold": {
+          "type": "number",
+          "default": 0.8,
+          "minimum": 0.05,
+          "maximum": 1,
+          "description": "Score at which a line is considered reviewed (used by 'Go to Next Unreviewed Line')."
+        },
+        "antiVibe.colors.unseen": {
+          "type": "string",
+          "default": "rgba(40, 120, 255, 0.28)",
+          "description": "Background colour for new code that has not been seen yet (rgb/rgba/#hex)."
+        },
+        "antiVibe.colors.seen": {
+          "type": "string",
+          "default": "rgba(255, 70, 170, 0.22)",
+          "description": "Background colour for new code that has been fully reviewed (rgb/rgba/#hex)."
+        },
+        "antiVibe.hideWhenFullyReviewed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Remove the colour entirely once a line is fully reviewed."
+        },
+        "antiVibe.ignoreWhitespaceOnlyLines": {
+          "type": "boolean",
+          "default": true,
+          "description": "Do not track or colour empty / whitespace-only lines."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "node esbuild.js --production && vsce package --no-dependencies --allow-missing-repository",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "tsc -p tsconfig.test.json && mocha \"out/test/**/*.test.js\"",
+    "vscode:prepublish": "node esbuild.js --production"
+  },
+  "dependencies": {
+    "diff": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/diff": "^5.2.1",
+    "@types/mocha": "^10.0.7",
+    "@types/node": "^20.14.0",
+    "@types/vscode": "~1.90.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.24.0",
+    "mocha": "^10.7.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["test", "src/tracking/lineKeys.ts", "src/tracking/newLines.ts", "src/tracking/scoring.ts", "src/ui/color.ts"]
+}
