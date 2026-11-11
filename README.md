@@ -27,9 +27,9 @@ AI assistants write a lot of code quickly. Reviewing it is the hard part: after 
 
 | Signal | Meaning | Setting |
 | --- | --- | --- |
-| Code in view | Time a line spends in the **focus area**: the middle part of the editor (30% by default). Near the top or bottom of a file the area moves to that edge. Doesn't count while you scroll fast | `antiVibe.signals.viewport.*` |
+| Reading (code on screen) | Time a line spends in the **reading area**: a band in the middle of the editor (30% by default), never the whole screen. Near the top or bottom of a file the band moves to that edge; in a file that fits on screen it follows the cursor. Doesn't count while you scroll fast | `antiVibe.signals.viewport.*` |
 | Cursor on a line | Time the cursor sits on a line (neighbouring lines get half). Can be set to instant | `antiVibe.signals.cursor.*` |
-| Selected lines | Time code is selected. Can be set to instant | `antiVibe.signals.selection.*` |
+| Selecting lines | Time code is selected (mouse, Shift+arrows, Ctrl+A/L/D). Can be set to instant | `antiVibe.signals.selection.*` |
 | Mouse hover | The mouse resting over code | `antiVibe.signals.hover.*` |
 | Typed by you | Small edits you make in the active editor | `antiVibe.signals.typing.*` |
 
@@ -45,8 +45,8 @@ Use **Exportâ€¦** in the Settings block (or **Anti-Vibe Coder: Export Settingsâ€
 | --- | --- | --- |
 | `antiVibe.baseBranch` | *(auto)* | Branch to compare against. Empty means auto-detect: `origin/HEAD`, then `main`, then `master` |
 | `antiVibe.signals.<signal>.enabled` | `true` | Turn a signal on or off |
-| `antiVibe.signals.<signal>.weight` | varies | How much the signal counts per second or per event (1.0 = fully seen; for cursor and selection, 1.0 means instant) |
-| `antiVibe.signals.viewport.focusArea` | `0.3` | Part of the editor height that counts as being read (1 = whole screen) |
+| `antiVibe.signals.<signal>.weight` | varies | How much the signal counts per second or per event (1.0 = fully seen; for cursor, selection and hover, 1.0 means instant) |
+| `antiVibe.signals.viewport.focusArea` | `0.3` | Reading area: part of the editor height that counts as being read (1 = whole screen) |
 | `antiVibe.signals.typing.maxChars` | `80` | Edits larger than this don't count as your own typing |
 | `antiVibe.idleTimeoutSeconds` | `60` | Stop counting after this long without activity |
 | `antiVibe.reviewedThreshold` | `0.8` | Line progress at which a line counts as fully seen (full seen colour, skipped by Next Unreviewed) |

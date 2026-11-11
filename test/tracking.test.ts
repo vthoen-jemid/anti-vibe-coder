@@ -147,7 +147,22 @@ describe('focusLines', () => {
     assert.deepStrictEqual(focusLines(range(950, 999), 1000, 0.3), range(985, 999));
   });
 
-  it('counts the whole screen when the file barely scrolls', () => {
-    assert.deepStrictEqual(focusLines(range(0, 29), 32, 0.3), range(0, 29));
+  it('never counts the whole screen for a short file', () => {
+    // 30 lines visible, 30% band = 9 lines.
+    assert.deepStrictEqual(focusLines(range(0, 29), 30, 0.3), range(10, 18));
+    assert.deepStrictEqual(focusLines(range(0, 29), 32, 0.3).length, 9);
+  });
+
+  it('follows the cursor in a short file', () => {
+    assert.deepStrictEqual(focusLines(range(0, 29), 30, 0.3, 5), range(1, 9));
+    assert.deepStrictEqual(focusLines(range(0, 29), 30, 0.3, 0), range(0, 8));
+    assert.deepStrictEqual(focusLines(range(0, 29), 30, 0.3, 29), range(21, 29));
+    // A cursor that is off screen is ignored.
+    assert.deepStrictEqual(focusLines(range(0, 29), 30, 0.3, 50), range(10, 18));
+  });
+
+  it('sweeps across the screen while scrolling a file that barely scrolls', () => {
+    assert.deepStrictEqual(focusLines(range(0, 29), 32, 0.3), range(0, 8));
+    assert.deepStrictEqual(focusLines(range(2, 31), 32, 0.3), range(23, 31));
   });
 });

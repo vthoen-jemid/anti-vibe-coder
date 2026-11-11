@@ -89,7 +89,7 @@ export class SignalCollector implements vscode.Disposable {
               visible.push(l);
             }
           }
-          const lines = focusLines(visible, doc.lineCount, cfg.viewport.focusArea);
+          const lines = focusLines(visible, doc.lineCount, cfg.viewport.focusArea, editor.selection.active.line);
           // Editors other than the focused one get half weight.
           const focusFactor = editor === active ? 1 : 0.5;
           const inc = cfg.viewport.weight * dt * focusFactor * Math.min(1, COMFORTABLE_LINES / Math.max(1, lines.length));
@@ -131,8 +131,12 @@ export class SignalCollector implements vscode.Disposable {
    * the moment you click or select, instead of on the next one-second tick.
    */
   private onSelectionChanged(e: vscode.TextEditorSelectionChangeEvent): void {
-    // Only real user input: ignore programmatic moves such as "Go to Next Unreviewed".
-    if (e.kind !== vscode.TextEditorSelectionChangeKind.Mouse && e.kind !== vscode.TextEditorSelectionChangeKind.Keyboard) {
+    // Only user input: programmatic moves such as "Go to Next Unreviewed" have no kind.
+    // Commands (Ctrl+A, Ctrl+L, Ctrl+D, ...) count for selections but not for the cursor,
+    // so jumping somewhere with "Go to Line" does not mark it as seen.
+    const K = vscode.TextEditorSelectionChangeKind;
+    const byHand = e.kind === K.Mouse || e.kind === K.Keyboard;
+    if (!byHand && e.kind !== K.Command) {
       return;
     }
     if (!vscode.window.state.focused || e.textEditor !== vscode.window.activeTextEditor) {
@@ -147,7 +151,7 @@ export class SignalCollector implements vscode.Disposable {
     const deltas = new Map<number, number>();
     for (const sel of e.selections) {
       if (sel.isEmpty) {
-        if (instantCursor) {
+        if (instantCursor && byHand) {
           deltas.set(sel.active.line, 1);
         }
       } else if (instantSelection && sel.end.line - sel.start.line <= MAX_SELECTION_LINES) {

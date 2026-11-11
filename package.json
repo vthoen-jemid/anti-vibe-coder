@@ -2,7 +2,7 @@
   "name": "anti-vibe-coder",
   "displayName": "Anti-Vibe Coder",
   "description": "Review your whole branch against main and see which new code you have actually looked at: unseen lines are blue, reviewed lines turn pink.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "jem-id",
   "license": "MIT",
   "engines": {
@@ -259,7 +259,7 @@
         "antiVibe.signals.viewport.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Count time that lines are in the focus area of an open editor as seeing them."
+          "description": "Count time that lines are in the reading area (a band in the middle of the editor) as seeing them."
         },
         "antiVibe.signals.viewport.weight": {
           "type": "number",
@@ -272,7 +272,7 @@
           "default": 0.3,
           "minimum": 0.05,
           "maximum": 1,
-          "description": "Part of the visible editor that counts as being read, as a fraction of its height (0.3 = the middle 30%). Near the top or bottom of a file the area moves to that edge. 1 = the whole screen."
+          "description": "Reading area: part of the visible editor that counts as being read, as a fraction of its height (0.3 = the middle 30%). Near the top or bottom of a file the band moves to that edge; in a file that fits on screen it follows the cursor. 1 = the whole screen."
         },
         "antiVibe.signals.cursor.enabled": {
           "type": "boolean",
@@ -305,7 +305,7 @@
           "type": "number",
           "default": 0.15,
           "minimum": 0,
-          "description": "Score per hover on a line (1.0 = one hover is enough)."
+          "description": "Score per hover on a line. 1.0 or more = instant: a line is fully seen the moment the mouse rests on it (after editor.hover.delay)."
         },
         "antiVibe.signals.typing.enabled": {
           "type": "boolean",
@@ -370,7 +370,7 @@
   "scripts": {
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "package": "node esbuild.js --production && vsce package --no-dependencies --allow-missing-repository",
+    "package": "node esbuild.js --production && vsce package --no-dependencies --allow-missing-repository --out anti-vibe-coder.vsix",
     "typecheck": "tsc --noEmit -p .",
     "test": "tsc -p tsconfig.test.json && mocha \"out/test/**/*.test.js\"",
     "vscode:prepublish": "node esbuild.js --production"

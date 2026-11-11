@@ -18,46 +18,59 @@ interface SignalField {
 const SIGNALS: SignalField[] = [
   {
     key: 'signals.viewport',
-    label: 'Code in view',
-    hint: 'Lines inside the focus area of an open editor, while you are not scrolling.',
+    label: 'Reading (code on screen)',
+    hint: 'Lines inside the reading area of the editor (see below), while you are not scrolling.',
     unit: 'sec',
-    eta: 'in the focus area',
+    eta: 'in the reading area',
   },
   {
     key: 'signals.cursor',
     label: 'Cursor on a line',
-    hint: 'The line with the cursor. The 2 lines around it count half.',
+    hint: 'The line with the text cursor. The 2 lines around it count for half.',
     unit: 'sec',
     instant: 'the moment you click on it',
     eta: 'with the cursor on it',
   },
   {
     key: 'signals.selection',
-    label: 'Selected lines',
-    hint: 'Every line inside a selection.',
+    label: 'Selecting lines',
+    hint: 'Every line inside a selection (mouse, Shift+arrows, Ctrl+A/L/D, ...).',
     unit: 'sec',
     instant: 'the moment you select it',
     eta: 'selected',
   },
   {
     key: 'signals.hover',
-    label: 'Mouse hover',
-    hint: 'The mouse resting on a line (after the editor hover delay).',
+    label: 'Hovering with the mouse',
+    hint: 'The mouse resting on code. VS Code only reports this after its hover delay (editor.hover.delay, 300 ms by default) and only while editor.hover.enabled is on.',
     unit: 'hover',
+    instant: 'the moment the mouse rests on it',
     eta: '',
   },
   {
     key: 'signals.typing',
-    label: 'Typed by you',
+    label: 'Typing it yourself',
     hint: 'Small edits you make by hand. Pastes and AI edits never count.',
     unit: 'edit',
     eta: '',
   },
 ];
 
-/** Slider steps: amount of time / events until a line is fully seen. */
-const SEC_STEPS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 75, 90, 120, 150, 180, 240, 300, 450, 600];
-const COUNT_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100];
+/** Builds a dense list of slider steps: [from, to, step] segments. */
+function steps(segments: [number, number, number][]): number[] {
+  const out: number[] = [];
+  for (const [from, to, step] of segments) {
+    for (let v = from; v < to - 1e-9; v += step) {
+      out.push(Math.round(v * 10) / 10);
+    }
+  }
+  out.push(segments[segments.length - 1][1]);
+  return out;
+}
+
+/** Slider steps: amount of time / events until a line is fully seen (index 0 = fastest). */
+const SEC_STEPS = steps([[1, 10, 0.5], [10, 30, 1], [30, 60, 2], [60, 120, 5], [120, 300, 10], [300, 600, 30], [600, 1200, 60]]);
+const COUNT_STEPS = steps([[1, 20, 1], [20, 50, 2], [50, 100, 5]]);
 
 /** Collapsible "Settings" block in the sidebar to tune signals, thresholds and colours. */
 export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
@@ -160,7 +173,8 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
   .head label { flex: 1; font-weight: 600; }
   .value { font-variant-numeric: tabular-nums; color: var(--vscode-descriptionForeground); text-align: right; white-space: nowrap; }
   .hint { color: var(--vscode-descriptionForeground); font-size: 11px; margin: 2px 0 4px; }
-  .eta { font-size: 11px; margin: 2px 0 0; }
+  .eta, .area-text { font-size: 11px; margin: 2px 0 0; }
+  .area-text { margin: 0 0 4px; }
   .eta.off { color: var(--vscode-descriptionForeground); }
   input[type=range] { width: 100%; margin: 0; accent-color: var(--vscode-focusBorder); }
   input[type=range]:disabled { opacity: .4; }
@@ -190,20 +204,21 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
 </style>
 </head>
 <body>
-  <h3>What counts as seeing code</h3>
-  <p class="intro">Drag right to make a signal count faster. The number is how long (or how often) it takes for a line to become fully seen.</p>
+  <h3>How code becomes seen</h3>
+  <p class="intro">Every new line has a progress from 0% to 100%. Each signal below adds progress. The number is how long (or how many times) one signal alone needs to make a line fully seen. Slide right for less, type in the box for an exact value, or use the arrow keys on a slider for small steps.</p>
   <div id="signals"></div>
 
-  <h3>When is code seen</h3>
-  <div class="row" data-key="reviewedThreshold">
-    <div class="head"><label for="thr-full">Fully seen at</label><span class="value"></span></div>
-    <div class="hint">A line gets the full seen colour and is skipped by “Next Unreviewed” once it reaches this progress.</div>
-    <input type="range" id="thr-full" min="5" max="100" step="1">
-  </div>
+  <h3>Seen levels</h3>
+  <p class="intro">Where the line between unseen, partially seen and fully seen lies.</p>
   <div class="row" data-key="partiallySeenThreshold">
-    <div class="head"><label for="thr-part">Partially seen at</label><span class="value"></span></div>
-    <div class="hint">A file moves from Unseen to Partially seen once its new lines reach this average progress.</div>
-    <input type="range" id="thr-part" min="1" max="100" step="1">
+    <div class="head"><label for="thr-part">Partially seen from</label><span class="value"><input type="number" min="0" max="100" step="1" data-for="thr-part"> %</span></div>
+    <div class="hint">A file moves from <b>Unseen</b> to <b>Partially seen</b> in the overview once its new lines reach this average progress.</div>
+    <input type="range" id="thr-part" min="0" max="100" step="1">
+  </div>
+  <div class="row" data-key="reviewedThreshold">
+    <div class="head"><label for="thr-full">Fully seen from</label><span class="value"><input type="number" min="5" max="100" step="1" data-for="thr-full"> %</span></div>
+    <div class="hint">A line with this much progress gets the full seen colour and is skipped by “Next Unreviewed”. A file is <b>Fully seen</b> when all its new lines are.</div>
+    <input type="range" id="thr-full" min="5" max="100" step="1">
   </div>
   <div class="scale">
     <div id="gradient"></div>
@@ -213,9 +228,9 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
 
   <h3>General</h3>
   <div class="row" data-key="idleTimeoutSeconds">
-    <div class="head"><label for="idle">Pause after inactivity</label><span class="value"></span></div>
-    <div class="hint">Stop counting when you have not touched VS Code for this long.</div>
-    <input type="range" id="idle" min="5" max="600" step="5">
+    <div class="head"><label for="idle">Pause after no activity for</label><span class="value"><input type="number" min="5" max="3600" step="1" data-for="idle"> s</span></div>
+    <div class="hint">Reading time stops counting when you have not touched VS Code for this long.</div>
+    <input type="range" id="idle" min="5" max="600" step="1">
   </div>
   <div class="row" data-color="colors.unseen">
     <div class="head"><label>Unseen colour</label><span class="value"></span></div>
@@ -292,12 +307,13 @@ function build() {
       '<span class="value"><input type="number" min="1" step="any" title="Exact amount until fully seen"> ' + UNIT[f.unit] + '</span></div>' +
       '<div class="hint">' + f.hint + '</div>' +
       '<input type="range" class="speed" min="0" max="' + (steps.length - 1) + '" step="1">' +
-      '<div class="ends"><span>slower</span><span>' + (f.instant ? 'instant' : 'faster') + '</span></div>' +
+      '<div class="ends"><span>needs more</span><span>' + (f.instant ? 'instant' : 'needs less') + '</span></div>' +
       '<div class="eta"></div>' +
       (f.key === 'signals.viewport'
-        ? '<div class="sub" data-focus><div class="head"><label for="focus-area">Focus area</label><span class="value"></span></div>' +
-          '<div class="hint">Only this middle part of the editor counts, where you are actually reading. Near the top or bottom of a file the area moves along to the edge.</div>' +
-          '<div class="focus"><div class="screen"><div class="band"></div></div><input type="range" id="focus-area" min="5" max="100" step="5"></div></div>'
+        ? '<div class="sub" data-focus><div class="head"><label for="focus-area">Reading area</label><span class="value"><input type="number" min="5" max="100" step="1" data-for="focus-area"> %</span></div>' +
+          '<div class="hint">Only this band in the middle of the editor counts, not the whole screen. Near the top or bottom of a file the band moves along to the edge. In a file that fits on screen it follows your cursor. 100% = the whole screen.</div>' +
+          '<div class="area-text"></div>' +
+          '<div class="focus"><div class="screen"><div class="band"></div></div><input type="range" id="focus-area" min="5" max="100" step="1"></div></div>'
         : '');
     const on = $('input[type=checkbox]', row), range = $('input.speed', row), num = $('input[type=number]', row);
     on.addEventListener('change', () => { send(f.key + '.enabled', on.checked); render(); });
@@ -308,16 +324,31 @@ function build() {
       if (n >= 1 && isFinite(n)) send(f.key + '.weight', weightOf(n));
       render();
     });
-    const focus = $('#focus-area', row);
-    if (focus) focus.addEventListener('input', () => { send('signals.viewport.focusArea', +focus.value / 100); render(); });
     sig.appendChild(row);
   }
 
-  const pct = (id, key) => { const r = $(id); r.addEventListener('input', () => { send(key, +r.value / 100); render(); }); };
-  pct('#thr-full', 'reviewedThreshold');
-  pct('#thr-part', 'partiallySeenThreshold');
-  const idle = $('#idle');
-  idle.addEventListener('input', () => { send('idleTimeoutSeconds', +idle.value); render(); });
+  // Sliders with an exact number box next to them. Both call the same setter.
+  const setters = {
+    'focus-area': (v) => send('signals.viewport.focusArea', v / 100),
+    'thr-part': (v) => {
+      send('partiallySeenThreshold', v / 100);
+      if (v / 100 > (+values.reviewedThreshold || 0)) send('reviewedThreshold', Math.max(5, v) / 100);
+    },
+    'thr-full': (v) => {
+      send('reviewedThreshold', v / 100);
+      if (v / 100 < (+values.partiallySeenThreshold || 0)) send('partiallySeenThreshold', v / 100);
+    },
+    'idle': (v) => send('idleTimeoutSeconds', v),
+  };
+  for (const [id, set] of Object.entries(setters)) {
+    const r = $('#' + id), num = $('input[data-for="' + id + '"]');
+    r.addEventListener('input', () => { set(+r.value); render(); });
+    num.addEventListener('change', () => {
+      const v = +num.value;
+      if (num.value !== '' && isFinite(v)) set(Math.min(+num.max, Math.max(+num.min, v)));
+      render();
+    });
+  }
 
   for (const row of document.querySelectorAll('[data-color]')) {
     const key = row.dataset.color, pick = $('input[type=color]', row), alpha = $('input[type=range]', row);
@@ -358,7 +389,10 @@ function render() {
     if (focus) {
       const a = Math.round((+values['signals.viewport.focusArea'] || 1) * 100);
       setIfIdle($('#focus-area', focus), a);
-      $('.value', focus).textContent = a >= 100 ? 'whole screen' : 'middle ' + a + '%';
+      setIfIdle($('input[data-for="focus-area"]'), a);
+      $('.area-text', focus).textContent = a >= 100
+        ? 'Now: everything on screen counts.'
+        : 'Now: the middle ' + a + '% of the screen (about ' + Math.max(1, Math.round(a / 2)) + ' of 50 visible lines).';
       const band = $('.band', focus);
       band.style.top = (100 - a) / 2 + '%';
       band.style.height = a + '%';
@@ -370,12 +404,12 @@ function render() {
   const part = Math.round((+values.partiallySeenThreshold || 0) * 100);
   setIfIdle($('#thr-full'), full);
   setIfIdle($('#thr-part'), part);
-  $('[data-key="reviewedThreshold"] .value').textContent = full + '%';
-  $('[data-key="partiallySeenThreshold"] .value').textContent = part + '%';
+  setIfIdle($('input[data-for="thr-full"]'), full);
+  setIfIdle($('input[data-for="thr-part"]'), part);
 
   const idle = +values.idleTimeoutSeconds || 0;
   setIfIdle($('#idle'), idle);
-  $('[data-key="idleTimeoutSeconds"] .value').textContent = duration(idle);
+  setIfIdle($('input[data-for="idle"]'), idle);
 
   for (const row of document.querySelectorAll('[data-color]')) {
     const c = parse(values[row.dataset.color]), pick = $('input[type=color]', row), alpha = $('input[type=range]', row);

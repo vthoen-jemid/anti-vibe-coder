@@ -492,7 +492,7 @@ export class Tracker implements vscode.Disposable {
     this.fireTimer = setTimeout(() => {
       this.fireTimer = undefined;
       this.fireNow();
-    }, 150);
+    }, 60);
   }
 
   private fireNow(): void {
