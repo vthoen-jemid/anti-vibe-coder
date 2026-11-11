@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import { computeLineKeys, splitLines } from '../src/tracking/lineKeys';
+import { focusLines } from '../src/tracking/focus';
 import { computeNewLines } from '../src/tracking/newLines';
 import { bucketOf, bumpScore, categoryOf, progressRatio, pruneScores, ScoreMap, summarize } from '../src/tracking/scoring';
 import { mix, parseColor, toCss } from '../src/ui/color';
@@ -109,5 +110,44 @@ describe('categoryOf', () => {
     assert.strictEqual(categoryOf({ total: 10, sum: 1, reviewed: 0 }), 'partial');
     assert.strictEqual(categoryOf({ total: 10, sum: 9.5, reviewed: 9 }), 'partial');
     assert.strictEqual(categoryOf({ total: 10, sum: 8.5, reviewed: 10 }), 'reviewed');
+  });
+});
+
+describe('categoryOf with a custom partially-seen threshold', () => {
+  it('uses the given threshold', () => {
+    assert.strictEqual(categoryOf({ total: 10, sum: 1, reviewed: 0 }, 0.3), 'unseen');
+    assert.strictEqual(categoryOf({ total: 10, sum: 3, reviewed: 0 }, 0.3), 'partial');
+  });
+});
+
+describe('focusLines', () => {
+  const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+
+  it('takes the middle band when scrolled into the file', () => {
+    // 50 lines visible (100..149) in a 1000-line file, 30% band = 15 lines.
+    assert.deepStrictEqual(focusLines(range(100, 149), 1000, 0.3), range(117, 131));
+  });
+
+  it('returns everything when the area is the whole screen', () => {
+    assert.deepStrictEqual(focusLines(range(0, 9), 100, 1), range(0, 9));
+  });
+
+  it('slides to the top edge at the start of a file without skipping lines', () => {
+    assert.deepStrictEqual(focusLines(range(0, 49), 1000, 0.3), range(0, 14));
+    assert.deepStrictEqual(focusLines(range(1, 50), 1000, 0.3), range(2, 16));
+    // Every line from 0 up to the centred band is reachable while scrolling down.
+    const covered = new Set<number>();
+    for (let top = 0; top < 30; top++) {
+      focusLines(range(top, top + 49), 1000, 0.3).forEach((l) => covered.add(l));
+    }
+    assert.ok(range(0, 60).every((l) => covered.has(l)));
+  });
+
+  it('slides to the bottom edge at the end of a file', () => {
+    assert.deepStrictEqual(focusLines(range(950, 999), 1000, 0.3), range(985, 999));
+  });
+
+  it('counts the whole screen when the file barely scrolls', () => {
+    assert.deepStrictEqual(focusLines(range(0, 29), 32, 0.3), range(0, 29));
   });
 });

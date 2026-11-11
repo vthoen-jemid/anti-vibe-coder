@@ -84,11 +84,13 @@ export class DecorationPainter implements vscode.Disposable {
     const ranges: vscode.Range[][] = this.types.map(() => []);
     if (state) {
       const scores = this.tracker.store.peekFile(state.repo.storeKey, state.rel);
+      const threshold = Math.max(0.01, this.tracker.config.reviewedThreshold);
       for (let l = 0; l < state.keys.length && l < editor.document.lineCount; l++) {
         if (!state.isNew[l]) {
           continue;
         }
-        const b = bucketOf(scores?.get(state.keys[l]) ?? 0, BUCKETS);
+        // Scale so a line reaches the full "seen" colour at the fully-seen threshold.
+        const b = bucketOf((scores?.get(state.keys[l]) ?? 0) / threshold, BUCKETS);
         ranges[b].push(new vscode.Range(l, 0, l, 0));
       }
     }

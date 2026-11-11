@@ -15,7 +15,7 @@ AI assistants write a lot of code quickly. Reviewing it is the hard part: after 
 ## Features
 
 - **Line colours** on a blue → pink gradient. The scrollbar (overview ruler) shows where blue lines remain.
-- **Overview sidebar** that splits the changed files into **Unseen**, **Partially seen** and **Fully reviewed**, with the number of lines left to review.
+- **Overview sidebar** that splits the changed files into **Unseen**, **Partially seen** and **Fully seen**, with the number of lines left to review.
 - **Settings panel**: a collapsible block at the bottom of the sidebar with a slider for each signal, so you can tune how much each one counts.
 - **Open All Branch Changes**: one multi-file diff of the whole branch against its base.
 - **Go to Next Unreviewed Line** (`Ctrl+Alt+N` / `Cmd+Alt+N`): jumps to the next blue line, across files.
@@ -27,13 +27,17 @@ AI assistants write a lot of code quickly. Reviewing it is the hard part: after 
 
 | Signal | Meaning | Setting |
 | --- | --- | --- |
-| Code on screen | Time a line is visible. Counts less when many lines are on screen, and not at all while you scroll fast | `antiVibe.signals.viewport.*` |
-| Cursor on line | Time the cursor sits on a line (neighbouring lines get half) | `antiVibe.signals.cursor.*` |
-| Selecting code | Time code is selected | `antiVibe.signals.selection.*` |
-| Hovering code | The mouse resting over code | `antiVibe.signals.hover.*` |
-| Typing yourself | Small edits you make in the active editor | `antiVibe.signals.typing.*` |
+| Code in view | Time a line spends in the **focus area**: the middle part of the editor (30% by default). Near the top or bottom of a file the area moves to that edge. Doesn't count while you scroll fast | `antiVibe.signals.viewport.*` |
+| Cursor on a line | Time the cursor sits on a line (neighbouring lines get half). Can be set to instant | `antiVibe.signals.cursor.*` |
+| Selected lines | Time code is selected. Can be set to instant | `antiVibe.signals.selection.*` |
+| Mouse hover | The mouse resting over code | `antiVibe.signals.hover.*` |
+| Typed by you | Small edits you make in the active editor | `antiVibe.signals.typing.*` |
 
-Nothing counts while the VS Code window is unfocused or you've been idle longer than `antiVibe.idleTimeoutSeconds`. Every signal can be switched off or reweighted in the sidebar's **Settings** block or in your VS Code settings.
+Nothing counts while the VS Code window is unfocused or you've been idle longer than `antiVibe.idleTimeoutSeconds`. Every signal can be switched off or tuned in the sidebar's **Settings** block or in your VS Code settings. The sliders show how long (or how many hovers or edits) it takes for a line to become fully seen. You can also type an exact value.
+
+### Sharing settings
+
+Use **Export…** in the Settings block (or **Anti-Vibe Coder: Export Settings…**) to save your settings as a JSON file, and **Import…** to load one. The file uses the normal setting ids, so you can also paste its contents into a `settings.json`. `antiVibe.baseBranch` is not included, because it belongs to one repository.
 
 ## Settings
 
@@ -41,12 +45,14 @@ Nothing counts while the VS Code window is unfocused or you've been idle longer 
 | --- | --- | --- |
 | `antiVibe.baseBranch` | *(auto)* | Branch to compare against. Empty means auto-detect: `origin/HEAD`, then `main`, then `master` |
 | `antiVibe.signals.<signal>.enabled` | `true` | Turn a signal on or off |
-| `antiVibe.signals.<signal>.weight` | varies | How much the signal counts (1.0 = fully reviewed) |
+| `antiVibe.signals.<signal>.weight` | varies | How much the signal counts per second or per event (1.0 = fully seen; for cursor and selection, 1.0 means instant) |
+| `antiVibe.signals.viewport.focusArea` | `0.3` | Part of the editor height that counts as being read (1 = whole screen) |
 | `antiVibe.signals.typing.maxChars` | `80` | Edits larger than this don't count as your own typing |
 | `antiVibe.idleTimeoutSeconds` | `60` | Stop counting after this long without activity |
-| `antiVibe.reviewedThreshold` | `0.8` | Score at which a line counts as reviewed |
+| `antiVibe.reviewedThreshold` | `0.8` | Line progress at which a line counts as fully seen (full seen colour, skipped by Next Unreviewed) |
+| `antiVibe.partiallySeenThreshold` | `0.1` | Average file progress at which a file moves from Unseen to Partially seen |
 | `antiVibe.colors.unseen` / `antiVibe.colors.seen` | blue / pink | Gradient colours (`rgba()` or `#hex`) |
-| `antiVibe.hideWhenFullyReviewed` | `false` | Remove the colour once a line is fully reviewed |
+| `antiVibe.hideWhenFullyReviewed` | `false` | Remove the colour once a line is fully seen |
 | `antiVibe.ignoreWhitespaceOnlyLines` | `true` | Don't track empty lines |
 
 ## Installation

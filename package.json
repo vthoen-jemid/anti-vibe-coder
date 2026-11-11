@@ -2,7 +2,7 @@
   "name": "anti-vibe-coder",
   "displayName": "Anti-Vibe Coder",
   "description": "Review your whole branch against main and see which new code you have actually looked at: unseen lines are blue, reviewed lines turn pink.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "jem-id",
   "license": "MIT",
   "engines": {
@@ -121,6 +121,16 @@
         "title": "Show Review Colors",
         "category": "Anti-Vibe Coder",
         "icon": "$(eye-closed)"
+      },
+      {
+        "command": "antiVibe.exportSettings",
+        "title": "Export Settings…",
+        "category": "Anti-Vibe Coder"
+      },
+      {
+        "command": "antiVibe.importSettings",
+        "title": "Import Settings…",
+        "category": "Anti-Vibe Coder"
       }
     ],
     "menus": {
@@ -150,6 +160,14 @@
         },
         {
           "command": "antiVibe.openSettings",
+          "when": "view == antiVibe.changes"
+        },
+        {
+          "command": "antiVibe.exportSettings",
+          "when": "view == antiVibe.changes"
+        },
+        {
+          "command": "antiVibe.importSettings",
           "when": "view == antiVibe.changes"
         },
         {
@@ -201,12 +219,12 @@
       "editor/title": [
         {
           "command": "antiVibe.hideDecorations",
-          "when": "antiVibe.decorationsEnabled && antiVibe.activeFileTracked",
+          "when": "antiVibe.decorationsEnabled && antiVibe.hasRepo",
           "group": "navigation@100"
         },
         {
           "command": "antiVibe.showDecorations",
-          "when": "!antiVibe.decorationsEnabled && antiVibe.activeFileTracked",
+          "when": "!antiVibe.decorationsEnabled && antiVibe.hasRepo",
           "group": "navigation@100"
         }
       ]
@@ -241,13 +259,20 @@
         "antiVibe.signals.viewport.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Count time that lines are visible on screen as reviewing."
+          "description": "Count time that lines are in the focus area of an open editor as seeing them."
         },
         "antiVibe.signals.viewport.weight": {
           "type": "number",
           "default": 0.03,
           "minimum": 0,
-          "description": "Score per second a line gains while visible (1.0 = fully reviewed). Damped when many lines are visible."
+          "description": "Score per second a line in the focus area gains (1.0 = fully seen, so 0.03 ≈ 33 s). Damped when the focus area holds many lines."
+        },
+        "antiVibe.signals.viewport.focusArea": {
+          "type": "number",
+          "default": 0.3,
+          "minimum": 0.05,
+          "maximum": 1,
+          "description": "Part of the visible editor that counts as being read, as a fraction of its height (0.3 = the middle 30%). Near the top or bottom of a file the area moves to that edge. 1 = the whole screen."
         },
         "antiVibe.signals.cursor.enabled": {
           "type": "boolean",
@@ -258,7 +283,7 @@
           "type": "number",
           "default": 0.2,
           "minimum": 0,
-          "description": "Score per second for the cursor line when nothing is selected (neighbouring lines get half)."
+          "description": "Score per second for the cursor line (neighbouring lines get half). 1.0 or more = instant: the line is fully seen the moment you click on it."
         },
         "antiVibe.signals.selection.enabled": {
           "type": "boolean",
@@ -269,7 +294,7 @@
           "type": "number",
           "default": 0.1,
           "minimum": 0,
-          "description": "Score per second for every selected line."
+          "description": "Score per second for every selected line. 1.0 or more = instant: lines are fully seen the moment you select them."
         },
         "antiVibe.signals.hover.enabled": {
           "type": "boolean",
@@ -280,7 +305,7 @@
           "type": "number",
           "default": 0.15,
           "minimum": 0,
-          "description": "Score per hover event on a line."
+          "description": "Score per hover on a line (1.0 = one hover is enough)."
         },
         "antiVibe.signals.typing.enabled": {
           "type": "boolean",
@@ -310,7 +335,14 @@
           "default": 0.8,
           "minimum": 0.05,
           "maximum": 1,
-          "description": "Score at which a line is considered reviewed (used by 'Go to Next Unreviewed Line')."
+          "description": "Line progress at which a line counts as fully seen: it gets the full seen colour and is skipped by 'Go to Next Unreviewed Line'."
+        },
+        "antiVibe.partiallySeenThreshold": {
+          "type": "number",
+          "default": 0.1,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Average progress of a file's new lines at which it moves from Unseen to Partially seen in the overview."
         },
         "antiVibe.colors.unseen": {
           "type": "string",
@@ -320,12 +352,12 @@
         "antiVibe.colors.seen": {
           "type": "string",
           "default": "rgba(255, 70, 170, 0.22)",
-          "description": "Background colour for new code that has been fully reviewed (rgb/rgba/#hex)."
+          "description": "Background colour for new code that has been fully seen (rgb/rgba/#hex)."
         },
         "antiVibe.hideWhenFullyReviewed": {
           "type": "boolean",
           "default": false,
-          "description": "Remove the colour entirely once a line is fully reviewed."
+          "description": "Remove the colour entirely once a line is fully seen."
         },
         "antiVibe.ignoreWhitespaceOnlyLines": {
           "type": "boolean",

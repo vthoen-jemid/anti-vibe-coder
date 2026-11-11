@@ -29,10 +29,10 @@ class MessageNode {
 const GROUPS: { category: Category; label: string; icon: string; color: string; expanded: boolean }[] = [
   { category: 'unseen', label: 'Unseen', icon: 'eye-closed', color: 'charts.blue', expanded: true },
   { category: 'partial', label: 'Partially seen', icon: 'eye', color: 'charts.purple', expanded: true },
-  { category: 'reviewed', label: 'Fully reviewed', icon: 'pass-filled', color: 'charts.green', expanded: false },
+  { category: 'reviewed', label: 'Fully seen', icon: 'pass-filled', color: 'charts.green', expanded: false },
 ];
 
-/** Sidebar overview: changed files split into Unseen / Partially seen / Fully reviewed. */
+/** Sidebar overview: changed files split into Unseen / Partially seen / Fully seen. */
 export class ChangesTreeProvider implements vscode.TreeDataProvider<Node>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
@@ -90,7 +90,7 @@ export class ChangesTreeProvider implements vscode.TreeDataProvider<Node>, vscod
     if (files.length === 0) {
       return [new MessageNode(`No changes compared to ${repo.baseRef}.`)];
     }
-    return GROUPS.map((g) => new GroupNode(repo, g.category, files.filter((f) => categoryOf(f.progress) === g.category)));
+    return GROUPS.map((g) => new GroupNode(repo, g.category, files.filter((f) => categoryOf(f.progress, this.tracker.config.partialThreshold) === g.category)));
   }
 
   getTreeItem(node: Node): vscode.TreeItem {
@@ -137,7 +137,7 @@ export class ChangesTreeProvider implements vscode.TreeDataProvider<Node>, vscod
     const dir = path.posix.dirname(rel);
     item.description = `${pct}%${dir !== '.' ? ' · ' + dir : ''}`;
     item.tooltip = new vscode.MarkdownString(
-      `**${rel}**\n\n${pct}% reviewed · ${progress.reviewed}/${progress.total} new lines reviewed` +
+      `**${rel}**\n\n${pct}% seen · ${progress.reviewed}/${progress.total} new lines fully seen` +
         (repo.untracked.has(rel) ? '\n\n_untracked file_' : ''),
     );
     item.iconPath = vscode.ThemeIcon.File;

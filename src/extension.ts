@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { Repo } from './git/repo';
+import { exportSettings, importSettings } from './settingsIO';
 import { FileState, Tracker } from './tracker';
 import { SignalCollector } from './tracking/signals';
 import { BASE_SCHEME, BaseContentProvider } from './ui/baseContent';
@@ -25,6 +26,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('antiVibe.openSettings', () =>
       vscode.commands.executeCommand('antiVibe.settings.focus'),
     ),
+    vscode.commands.registerCommand('antiVibe.exportSettings', exportSettings),
+    vscode.commands.registerCommand('antiVibe.importSettings', importSettings),
     t,
     painter,
     tree,
@@ -234,16 +237,16 @@ export function activate(context: vscode.ExtensionContext): void {
   reg('antiVibe.hideDecorations', () => applyColors(false));
   reg('antiVibe.showDecorations', () => applyColors(true));
 
-  // Only show the title-bar button on files that are part of the branch diff.
-  const updateActiveContext = () => {
-    const doc = vscode.window.activeTextEditor?.document;
-    const tracked = !!doc && !!t.getDocState(doc)?.isNew.includes(1);
-    void vscode.commands.executeCommand('setContext', 'antiVibe.activeFileTracked', tracked);
+  // Show the title-bar eye button whenever a git repo is being tracked.
+  let lastHasRepo: boolean | undefined;
+  const updateRepoContext = () => {
+    const hasRepo = t.allRepos().some((r) => r.ready);
+    if (hasRepo !== lastHasRepo) {
+      lastHasRepo = hasRepo;
+      void vscode.commands.executeCommand('setContext', 'antiVibe.hasRepo', hasRepo);
+    }
   };
-  context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor(updateActiveContext),
-    t.onDidChange(updateActiveContext),
-  );
+  context.subscriptions.push(t.onDidChange(updateRepoContext));
 
   void t.refresh();
 }

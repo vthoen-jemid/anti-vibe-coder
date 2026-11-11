@@ -507,6 +507,9 @@ export class Tracker implements vscode.Disposable {
       this.docStates.clear();
       this.diskStates.clear();
       void this.refresh();
+    } else if (old.reviewedThreshold !== this.config.reviewedThreshold) {
+      // "Lines fully seen" counts depend on the threshold.
+      void this.recomputeAllStats().then(() => this.fireNow());
     } else {
       this.fireSoon();
     }

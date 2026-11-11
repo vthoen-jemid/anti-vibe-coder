@@ -72,19 +72,19 @@ export function progressRatio(p: Progress): number {
 
 export type Category = 'unseen' | 'partial' | 'reviewed';
 
-/** Below this mean score a file counts as "unseen". */
+/** Default mean score below which a file counts as "unseen". */
 export const UNSEEN_BELOW = 0.1;
 
 /**
- * unseen   – mean score < 10%
- * reviewed – every new line has reached the reviewed threshold
+ * unseen   – mean score < `partialThreshold`
+ * reviewed – every new line has reached the fully-seen threshold
  * partial  – everything in between
  */
-export function categoryOf(p: Progress): Category {
+export function categoryOf(p: Progress, partialThreshold = UNSEEN_BELOW): Category {
   if (p.total === 0 || p.reviewed >= p.total) {
     return 'reviewed';
   }
-  if (progressRatio(p) < UNSEEN_BELOW) {
+  if (progressRatio(p) < partialThreshold) {
     return 'unseen';
   }
   return 'partial';

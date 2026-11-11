@@ -7,13 +7,16 @@ export interface SignalConfig {
 
 export interface Config {
   baseBranch: string;
-  viewport: SignalConfig;
+  viewport: SignalConfig & { focusArea: number };
   cursor: SignalConfig;
   selection: SignalConfig;
   hover: SignalConfig;
   typing: SignalConfig & { maxChars: number };
   idleTimeoutSeconds: number;
+  /** Line score at which a line counts as fully seen. */
   reviewedThreshold: number;
+  /** Mean file score at which a file moves from "unseen" to "partially seen". */
+  partialThreshold: number;
   colorUnseen: string;
   colorSeen: string;
   hideWhenFullyReviewed: boolean;
@@ -27,6 +30,7 @@ export function readConfig(): Config {
     viewport: {
       enabled: c.get('signals.viewport.enabled', true),
       weight: c.get('signals.viewport.weight', 0.03),
+      focusArea: c.get('signals.viewport.focusArea', 0.3),
     },
     cursor: {
       enabled: c.get('signals.cursor.enabled', true),
@@ -47,6 +51,7 @@ export function readConfig(): Config {
     },
     idleTimeoutSeconds: c.get('idleTimeoutSeconds', 60),
     reviewedThreshold: c.get('reviewedThreshold', 0.8),
+    partialThreshold: c.get('partiallySeenThreshold', 0.1),
     colorUnseen: c.get('colors.unseen', 'rgba(40, 120, 255, 0.28)'),
     colorSeen: c.get('colors.seen', 'rgba(255, 70, 170, 0.22)'),
     hideWhenFullyReviewed: c.get('hideWhenFullyReviewed', false),
