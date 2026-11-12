@@ -8,6 +8,10 @@ import { bumpScore, getScore, Progress, pruneScores, ScoreMap, setScore, summari
 import { ReviewStore } from './tracking/store';
 
 const MAX_FILE_BYTES = 1.5 * 1024 * 1024;
+/** workspaceState key: { "<normRoot>::<branch>": "<base ref>" }. */
+const BRANCH_BASES_KEY = 'antiVibe.branchBases';
+
+export type BaseSource = 'branch' | 'setting' | 'auto';
 
 export interface FileState {
   repo: Repo;
@@ -48,8 +52,44 @@ export class Tracker implements vscode.Disposable {
   private refreshing: Promise<void> | undefined;
   private refreshAgain = false;
 
-  constructor(memento: vscode.Memento) {
+  constructor(private readonly memento: vscode.Memento) {
     this.store = new ReviewStore(memento);
+  }
+
+  // ---------------------------------------------------------- base branch
+
+  private branchBases(): Record<string, string> {
+    return this.memento.get<Record<string, string>>(BRANCH_BASES_KEY, {});
+  }
+
+  /** Base chosen for this repo + branch only, or '' if none. */
+  branchBase(repo: Repo, branch = repo.branch): string {
+    return this.branchBases()[`${repo.normRoot}::${branch}`] ?? '';
+  }
+
+  /** Base to compare against: per-branch choice, then the `baseBranch` setting, then '' (auto-detect). */
+  baseFor(repo: Repo, branch = repo.branch): { ref: string; source: BaseSource } {
+    const own = this.branchBase(repo, branch);
+    if (own) {
+      return { ref: own, source: 'branch' };
+    }
+    return this.config.baseBranch ? { ref: this.config.baseBranch, source: 'setting' } : { ref: '', source: 'auto' };
+  }
+
+  /** Remembers `ref` as the base for the repo's current branch ('' = forget). */
+  async setBranchBase(repo: Repo, ref: string): Promise<void> {
+    const all = { ...this.branchBases() };
+    const key = `${repo.normRoot}::${repo.branch}`;
+    ref = ref.trim();
+    if (ref) {
+      all[key] = ref;
+    } else {
+      delete all[key];
+    }
+    await this.memento.update(BRANCH_BASES_KEY, all);
+    this.docStates.clear();
+    this.diskStates.clear();
+    await this.refresh();
   }
 
   // ---------------------------------------------------------------- repos
@@ -102,7 +142,7 @@ export class Tracker implements vscode.Disposable {
     await this.discoverRepos();
     for (const repo of this.repos.values()) {
       const oldKey = repo.storeKey;
-      const changed = await repo.refresh(this.config.baseBranch);
+      const changed = await repo.refresh((branch) => this.baseFor(repo, branch).ref);
       if (changed || oldKey !== repo.storeKey) {
         this.invalidateRepo(repo);
       }

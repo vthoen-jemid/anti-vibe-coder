@@ -18,7 +18,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const painter = new DecorationPainter(t);
   const tree = new ChangesTreeProvider(t);
   const treeView = vscode.window.createTreeView('antiVibe.changes', { treeDataProvider: tree, showCollapseAll: true });
-  const settingsView = new SettingsViewProvider();
+  const settingsView = new SettingsViewProvider(t);
 
   context.subscriptions.push(
     settingsView,
@@ -211,13 +211,9 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!repo) {
       return;
     }
-    const branches = await repo.listBranches();
-    const pick = await vscode.window.showQuickPick(
-      [{ label: '$(sync) Auto-detect', value: '' }, ...branches.map((b) => ({ label: b, value: b, description: b === repo.baseRef ? 'current' : undefined }))],
-      { placeHolder: `Compare ${repo.branch} against…` },
-    );
-    if (pick) {
-      await vscode.workspace.getConfiguration('antiVibe').update('baseBranch', pick.value, vscode.ConfigurationTarget.Workspace);
+    const ref = await pickBaseRef(t, repo);
+    if (ref !== undefined) {
+      await t.setBranchBase(repo, ref);
     }
   });
 
@@ -288,6 +284,45 @@ function currentFile(t: Tracker): { repo: Repo; rel: string } | undefined {
   const doc = vscode.window.activeTextEditor?.document;
   const repo = doc && t.repoFor(doc.uri);
   return repo && doc ? { repo, rel: repo.rel(doc.uri.fsPath) } : undefined;
+}
+
+/**
+ * Asks which ref the repo's current branch should be compared against.
+ * Type any ref (branch, tag, commit) or pick a suggestion. '' = default.
+ */
+function pickBaseRef(t: Tracker, repo: Repo): Promise<string | undefined> {
+  type Item = vscode.QuickPickItem & { value: string };
+  const own = t.branchBase(repo);
+  const qp = vscode.window.createQuickPick<Item>();
+  qp.placeholder = `Compare ${repo.branch} against… (type a branch, tag or commit)`;
+  qp.matchOnDescription = true;
+  const fixed: Item[] = [{ label: '$(sync) Default', description: t.config.baseBranch || 'auto-detect', value: '' }];
+  let branches: Item[] = [];
+  const update = () => {
+    const typed = qp.value.trim();
+    const custom: Item[] = typed && !branches.some((b) => b.value === typed) ? [{ label: typed, description: 'use this ref', value: typed }] : [];
+    qp.items = [...custom, ...fixed, ...branches];
+  };
+  qp.busy = true;
+  void repo.listBranches().then((list) => {
+    branches = list.map((b) => ({ label: b, value: b, description: b === own ? 'chosen for this branch' : b === repo.baseRef ? 'current' : undefined }));
+    qp.busy = false;
+    update();
+  });
+  update();
+  qp.onDidChangeValue(update);
+  return new Promise((resolve) => {
+    let result: string | undefined;
+    qp.onDidAccept(() => {
+      result = qp.selectedItems[0]?.value ?? qp.value.trim();
+      qp.hide();
+    });
+    qp.onDidHide(() => {
+      qp.dispose();
+      resolve(result);
+    });
+    qp.show();
+  });
 }
 
 async function pickRepo(t: Tracker): Promise<Repo | undefined> {

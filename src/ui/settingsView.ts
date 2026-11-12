@@ -1,5 +1,7 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { resetSettings, SECTION, SHAREABLE_KEYS } from '../settingsIO';
+import { Tracker } from '../tracker';
 
 /**
  * Signals are shown as "how long / how often until a line is fully seen"
@@ -75,16 +77,20 @@ const COUNT_STEPS = steps([[1, 20, 1], [20, 50, 2], [50, 100, 5]]);
 /** Collapsible "Settings" block in the sidebar to tune signals, thresholds and colours. */
 export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   private view: vscode.WebviewView | undefined;
-  private sub: vscode.Disposable;
+  private subs: vscode.Disposable[];
   private pending = new Map<string, unknown>();
   private writeTimer: NodeJS.Timeout | undefined;
+  private lastRepos = '';
 
-  constructor() {
-    this.sub = vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration(SECTION)) {
-        this.postValues();
-      }
-    });
+  constructor(private readonly tracker: Tracker) {
+    this.subs = [
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration(SECTION)) {
+          this.postValues();
+        }
+      }),
+      tracker.onDidChange(() => this.postRepos()),
+    ];
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -93,7 +99,57 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
     view.webview.html = this.html();
     view.webview.onDidReceiveMessage((msg) => this.onMessage(msg));
     view.onDidDispose(() => (this.view = undefined));
-    view.onDidChangeVisibility(() => view.visible && this.postValues());
+    view.onDidChangeVisibility(() => {
+      if (view.visible) {
+        this.postValues();
+        this.postRepos(true);
+      }
+    });
+  }
+
+  /** Per repo: current branch and what it is compared against. Only sent when it changed. */
+  private postRepos(force = false): void {
+    if (!this.view) {
+      return;
+    }
+    const repos = this.tracker.allRepos().map((r) => {
+      const base = this.tracker.baseFor(r);
+      return {
+        id: r.normRoot,
+        name: path.basename(r.root),
+        branch: r.branch,
+        baseRef: r.baseRef,
+        own: base.source === 'branch' ? base.ref : '',
+        fallback: this.tracker.config.baseBranch,
+        error: r.error,
+      };
+    });
+    const json = JSON.stringify(repos);
+    if (force || json !== this.lastRepos) {
+      this.lastRepos = json;
+      void this.view.webview.postMessage({ type: 'repos', repos });
+    }
+  }
+
+  private async setBase(id: string, value: string): Promise<void> {
+    const repo = this.tracker.allRepos().find((r) => r.normRoot === id);
+    if (!repo) {
+      return;
+    }
+    value = value.trim();
+    if (value && !(await repo.refExists(value))) {
+      void this.view?.webview.postMessage({ type: 'baseError', id, message: `"${value}" is not a branch, tag or commit in this repository.` });
+      return;
+    }
+    await this.tracker.setBranchBase(repo, value);
+    this.postRepos(true);
+  }
+
+  private async postBranches(id: string): Promise<void> {
+    const repo = this.tracker.allRepos().find((r) => r.normRoot === id);
+    if (repo) {
+      void this.view?.webview.postMessage({ type: 'branches', id, list: await repo.listBranches() });
+    }
   }
 
   private values(): Record<string, unknown> {
@@ -109,10 +165,21 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
     void this.view?.webview.postMessage({ type: 'values', values: this.values() });
   }
 
-  private onMessage(msg: { type: string; key?: string; value?: unknown }): void {
+  private onMessage(msg: { type: string; key?: string; value?: unknown; id?: string }): void {
     switch (msg.type) {
       case 'ready':
         this.postValues();
+        this.postRepos(true);
+        break;
+      case 'setBase':
+        if (msg.id) {
+          void this.setBase(msg.id, String(msg.value ?? ''));
+        }
+        break;
+      case 'branches':
+        if (msg.id) {
+          void this.postBranches(msg.id);
+        }
         break;
       case 'set':
         if (msg.key && (SHAREABLE_KEYS as readonly string[]).includes(msg.key)) {
@@ -196,6 +263,13 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
   #gradient { height: 10px; border-radius: 5px; }
   .mark { position: absolute; top: -2px; width: 2px; height: 14px; background: var(--vscode-foreground); transform: translateX(-1px); }
   .mark span { position: absolute; top: 15px; font-size: 10px; white-space: nowrap; color: var(--vscode-descriptionForeground); transform: translateX(-50%); }
+  .base { display: flex; gap: 6px; margin-top: 4px; }
+  .base input { flex: 1; min-width: 0; padding: 2px 4px; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px; font: inherit; }
+  .base input:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+  .base input.invalid { border-color: var(--vscode-inputValidation-errorBorder); }
+  .base button:disabled { opacity: .4; cursor: default; }
+  .base-msg { font-size: 11px; margin: 3px 0 0; }
+  .base-msg.err { color: var(--vscode-errorForeground); }
   .buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 16px; }
   button { border: none; padding: 4px 10px; cursor: pointer; color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); border-radius: 2px; }
   button:hover { background: var(--vscode-button-secondaryHoverBackground); }
@@ -204,6 +278,10 @@ export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.
 </style>
 </head>
 <body>
+  <h3>Compare against</h3>
+  <p class="intro">The branch your work will be merged into. Only changes since that branch count as new. Remembered per branch, so a branch stacked on another branch can compare against that one instead of main.</p>
+  <div id="repos"></div>
+
   <h3>How code becomes seen</h3>
   <p class="intro">Every new line has a progress from 0% to 100%. Each signal below adds progress. The number is how long (or how many times) one signal alone needs to make a line fully seen. Slide right for less, type in the box for an exact value, or use the arrow keys on a slider for small steps.</p>
   <div id="signals"></div>
@@ -431,8 +509,62 @@ function render() {
   $('#mark-full span').style.transform = 'translateX(' + (full > 85 ? '-100%' : '-50%') + ')';
 }
 
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ESC[c]);
+const loadedBranches = new Set();
+const repoRow = (id) => [...$('#repos').children].find((el) => el.dataset.id === id);
+function renderRepos(repos) {
+  const box = $('#repos');
+  for (const el of [...box.children]) if (!repos.some((r) => r.id === el.dataset.id)) el.remove();
+  $('#no-repo') && $('#no-repo').remove();
+  if (!repos.length) { box.innerHTML = '<p class="hint" id="no-repo">No git repository in this workspace.</p>'; return; }
+  repos.forEach((r, i) => {
+    let row = repoRow(r.id);
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'row';
+      row.dataset.id = r.id;
+      row.innerHTML = '<div class="head"><label for="base-' + i + '"></label></div>' +
+        '<div class="base"><input id="base-' + i + '" list="dl-' + i + '" spellcheck="false" autocomplete="off"><button title="Forget the choice for this branch">Default</button></div>' +
+        '<datalist id="dl-' + i + '"></datalist><div class="base-msg"></div>';
+      const input = $('input', row);
+      // Branch suggestions are only fetched when you actually open the field.
+      input.addEventListener('focus', () => {
+        if (!loadedBranches.has(r.id)) { loadedBranches.add(r.id); vscode.postMessage({ type: 'branches', id: r.id }); }
+      });
+      input.addEventListener('change', () => vscode.postMessage({ type: 'setBase', id: r.id, value: input.value }));
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { input.value = row.dataset.own; input.classList.remove('invalid'); input.blur(); }
+      });
+      $('button', row).addEventListener('click', () => { input.value = ''; vscode.postMessage({ type: 'setBase', id: r.id, value: '' }); });
+      box.appendChild(row);
+    }
+    row.dataset.own = r.own;
+    $('label', row).innerHTML = (repos.length > 1 ? esc(r.name) + ': ' : '') + 'Compare <b>' + esc(r.branch || '…') + '</b> against';
+    const input = $('input', row);
+    input.placeholder = r.fallback ? r.fallback + ' (setting)' : 'auto-detect' + (r.baseRef && !r.own ? ': ' + r.baseRef : '');
+    setIfIdle(input, r.own);
+    input.classList.remove('invalid');
+    $('button', row).disabled = !r.own;
+    const msg = $('.base-msg', row);
+    msg.classList.toggle('err', !!r.error);
+    msg.textContent = r.error ? r.error
+      : r.own ? 'Now: ' + r.branch + ' ↔ ' + r.baseRef + ', only for this branch.'
+      : r.baseRef ? 'Now: ' + r.branch + ' ↔ ' + r.baseRef + '. Type a branch to use another one for ' + r.branch + '.' : '';
+  });
+}
+
 window.addEventListener('message', (e) => {
-  if (e.data.type === 'values') { values = e.data.values; render(); }
+  const d = e.data;
+  if (d.type === 'values') { values = d.values; render(); }
+  else if (d.type === 'repos') renderRepos(d.repos);
+  else if (d.type === 'branches') {
+    const row = repoRow(d.id);
+    if (row) $('datalist', row).innerHTML = d.list.map((b) => '<option value="' + esc(b) + '">').join('');
+  } else if (d.type === 'baseError') {
+    const row = repoRow(d.id);
+    if (row) { $('input', row).classList.add('invalid'); const m = $('.base-msg', row); m.classList.add('err'); m.textContent = d.message; }
+  }
 });
 build();
 vscode.postMessage({ type: 'ready' });
@@ -445,6 +577,8 @@ vscode.postMessage({ type: 'ready' });
     if (this.writeTimer) {
       void this.flushWrites();
     }
-    this.sub.dispose();
+    for (const sub of this.subs) {
+      sub.dispose();
+    }
   }
 }

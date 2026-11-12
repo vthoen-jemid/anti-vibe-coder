@@ -254,7 +254,7 @@
         "antiVibe.baseBranch": {
           "type": "string",
           "default": "",
-          "description": "Branch to compare against. Empty = auto-detect (origin/HEAD, then main, then master)."
+          "description": "Default branch to compare against. Empty = auto-detect (origin/HEAD, then main, then master). A base chosen for a specific branch (Settings panel or \"Select Base Branch\") takes precedence."
         },
         "antiVibe.signals.viewport.enabled": {
           "type": "boolean",

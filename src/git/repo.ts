@@ -57,22 +57,18 @@ export class Repo {
     return this.changed.has(rel);
   }
 
-  /** Re-reads branch, base, merge-base and changed files. Returns true if anything changed. */
-  async refresh(configuredBase: string): Promise<boolean> {
+  /**
+   * Re-reads branch, base, merge-base and changed files. Returns true if anything changed.
+   * `baseFor` gets the current branch and returns the base to compare against ('' = auto-detect).
+   */
+  async refresh(baseFor: (branch: string) => string): Promise<boolean> {
     const before = this.signature();
     try {
       const branch = (await git(this.root, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim();
       this.branch = branch === 'HEAD' ? (await git(this.root, ['rev-parse', '--short', 'HEAD'])).trim() : branch;
 
-      this.baseRef = configuredBase || (await this.detectBase());
-      if (!this.baseRef) {
-        throw new Error('Could not find a base branch (main/master). Set "antiVibe.baseBranch".');
-      }
-
-      const mb = (await tryGit(this.root, ['merge-base', 'HEAD', this.baseRef]))?.trim();
-      if (!mb) {
-        throw new Error(`No merge-base between HEAD and "${this.baseRef}".`);
-      }
+      const { ref, mergeBase: mb } = await this.resolveBase(baseFor(this.branch));
+      this.baseRef = ref;
       if (mb !== this.mergeBase) {
         this.baseCache.clear();
         this.basePending.clear();
@@ -102,17 +98,51 @@ export class Repo {
     return [this.branch, this.baseRef, this.mergeBase, this.ready, [...this.changed].sort().join('|')].join('\n');
   }
 
-  private async detectBase(): Promise<string> {
-    const originHead = (await tryGit(this.root, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']))?.trim();
-    if (originHead) {
-      return originHead;
+  /**
+   * Picks the base ref and its merge-base with HEAD. A configured base is used
+   * as-is; otherwise candidates are tried in order and the first one that
+   * shares history with HEAD wins.
+   */
+  private async resolveBase(configuredBase: string): Promise<{ ref: string; mergeBase: string }> {
+    const candidates = configuredBase ? [configuredBase] : await this.baseCandidates();
+    if (candidates.length === 0) {
+      throw new Error('Could not find a base branch (main/master). Choose a base branch in the Anti-Vibe Coder settings.');
     }
-    for (const cand of ['main', 'master', 'origin/main', 'origin/master', 'develop']) {
-      if (await tryGit(this.root, ['rev-parse', '--verify', '--quiet', `${cand}^{commit}`])) {
-        return cand;
+    for (const ref of candidates) {
+      const mb = (await tryGit(this.root, ['merge-base', 'HEAD', ref]))?.trim();
+      if (mb) {
+        return { ref, mergeBase: mb };
       }
     }
-    return '';
+    throw new Error(await this.noMergeBaseMessage(candidates, !!configuredBase));
+  }
+
+  /** Existing base-branch candidates, most preferred first, without duplicates. */
+  private async baseCandidates(): Promise<string[]> {
+    const originHead = (await tryGit(this.root, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']))?.trim();
+    const names = [originHead, 'main', 'master', 'origin/main', 'origin/master', 'develop'];
+    const found: string[] = [];
+    for (const cand of names) {
+      if (!cand || found.includes(cand)) {
+        continue;
+      }
+      if (await tryGit(this.root, ['rev-parse', '--verify', '--quiet', `${cand}^{commit}`])) {
+        found.push(cand);
+      }
+    }
+    return found;
+  }
+
+  private async noMergeBaseMessage(tried: string[], configured: boolean): Promise<string> {
+    const list = tried.map((r) => `"${r}"`).join(', ');
+    const shallow = (await tryGit(this.root, ['rev-parse', '--is-shallow-repository']))?.trim() === 'true';
+    if (shallow) {
+      return `No merge-base between HEAD and ${list}: this is a shallow clone. Run "git fetch --unshallow".`;
+    }
+    const hint = configured
+      ? 'Check that the base branch you chose is a branch your work is based on.'
+      : 'HEAD shares no history with these branches. Choose the branch your work is based on in the Anti-Vibe Coder settings.';
+    return `No merge-base between HEAD and ${list}. ${hint}`;
   }
 
   hasBaseLoaded(rel: string): boolean {
@@ -153,6 +183,11 @@ export class Repo {
     } catch {
       return null;
     }
+  }
+
+  /** Whether `ref` names an existing commit-ish in this repo. */
+  async refExists(ref: string): Promise<boolean> {
+    return !!(await tryGit(this.root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]));
   }
 
   async listBranches(): Promise<string[]> {
