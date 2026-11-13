@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" aria-label="icon" role="img">
   <g stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M32 15V9"/>
-    <circle cx="32" cy="7" r="2" fill="#808080" stroke="none"/>
+    <circle cx="32" cy="7" r="6" fill="currentColor" stroke="none"/>
     <rect x="11" y="17" width="42" height="36" rx="7"/>
     <path d="M19 29l9 9m0-9l-9 9M36 29l9 9m0-9l-9 9"/>
     <path d="M26 45h12"/>
