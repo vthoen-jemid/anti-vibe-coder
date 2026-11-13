@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" aria-label="Dead robot icon" role="img">
-  <g stroke="#808080" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" aria-label="icon" role="img">
+  <g stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M32 15V9"/>
     <circle cx="32" cy="7" r="2" fill="#808080" stroke="none"/>
     <rect x="11" y="17" width="42" height="36" rx="7"/>
