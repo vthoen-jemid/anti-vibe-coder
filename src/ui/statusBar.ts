@@ -13,14 +13,7 @@ export class ReviewStatusBar implements vscode.Disposable {
   }
 
   private update(): void {
-    let total = 0;
-    let sum = 0;
-    let files = 0;
-    for (const s of this.tracker.getStats()) {
-      total += s.progress.total;
-      sum += s.progress.sum;
-      files++;
-    }
+    const { total, sum, files } = this.tracker.getTotals();
     const repos = this.tracker.allRepos().filter((r) => r.ready);
     if (repos.length === 0) {
       this.item.hide();

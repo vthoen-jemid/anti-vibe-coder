@@ -80,27 +80,25 @@ Review progress is stored **locally** in VS Code's workspace state, per reposito
 - Telling your own typing apart from tool edits is a heuristic. A small edit in the focused active editor counts as yours.
 - Cutting a block and pasting it elsewhere counts as new code.
 
+## Documentation
+
+The [`docs/`](docs/README.md) folder explains how the extension works and why:
+
+- [Features reference](docs/FEATURES.md): every command, signal and setting, and the exact rules behind them.
+- [Architecture](docs/ARCHITECTURE.md): components, data flow, caching and storage format.
+- [Performance](docs/PERFORMANCE.md): hot paths, budgets and benchmark results.
+- [Decision records](docs/decisions/README.md): why things are built the way they are.
+
 ## Development
 
 ```sh
 npm install
 npm run compile     # bundle to dist/
-npm run watch       # rebuild on change
 npm test            # unit tests (mocha)
-npm run typecheck
+npm run bench       # performance benchmarks
 ```
 
-Press **F5** in VS Code to start an Extension Development Host with the extension loaded.
-
-```
-src/
-  extension.ts          activation, commands, event wiring
-  tracker.ts            central model: repos, per-file state, scores
-  git/                  git CLI wrapper, merge-base and changed files
-  tracking/             line identity, diffing, scoring, signals, storage
-  ui/                   decorations, overview tree, settings webview, status bar
-test/                   unit tests for the pure logic
-```
+Press **F5** in VS Code to start an Extension Development Host with the extension loaded. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full workflow, the test layout and a manual test checklist.
 
 ## Contributing
 
