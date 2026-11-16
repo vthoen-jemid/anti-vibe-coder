@@ -38,17 +38,37 @@ export class ChangesTreeProvider implements vscode.TreeDataProvider<Node>, vscod
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
   private timer: NodeJS.Timeout | undefined;
   private sub: vscode.Disposable;
+  private lastSignature = '';
 
   constructor(private readonly tracker: Tracker) {
-    // Scores change every second while reading; refresh the tree at a calmer pace.
+    // Scores change every second while reading; refresh the tree at a calmer
+    // pace, and only when something it shows actually changed.
     this.sub = tracker.onDidChange(() => {
       if (!this.timer) {
         this.timer = setTimeout(() => {
           this.timer = undefined;
-          this._onDidChangeTreeData.fire();
+          const sig = this.signature();
+          if (sig !== this.lastSignature) {
+            this.lastSignature = sig;
+            this._onDidChangeTreeData.fire();
+          }
         }, 1000);
       }
     });
+  }
+
+  /** Everything the tree renders, as a string: repos, and per file its %, category and line counts. */
+  private signature(): string {
+    const parts: string[] = [];
+    for (const r of this.tracker.allRepos()) {
+      parts.push(`${r.normRoot}|${r.ready}|${r.branch}|${r.baseRef}|${r.error ?? ''}|${r.untracked.size}`);
+    }
+    const partial = this.tracker.config.partialThreshold;
+    for (const s of this.tracker.getStats()) {
+      const p = s.progress;
+      parts.push(`${s.repo.normRoot}|${s.rel}|${Math.floor(progressRatio(p) * 100)}|${categoryOf(p, partial)}|${p.reviewed}|${p.total}`);
+    }
+    return parts.join('\n');
   }
 
   /** Files ordered least reviewed first. */

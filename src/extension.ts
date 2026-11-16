@@ -40,34 +40,39 @@ export function activate(context: vscode.ExtensionContext): void {
   // Show overall progress in the view title.
   context.subscriptions.push(
     t.onDidChange(() => {
-      let total = 0;
-      let sum = 0;
-      for (const s of t.getStats()) {
-        total += s.progress.total;
-        sum += s.progress.sum;
+      const { total, sum } = t.getTotals();
+      const description = total ? `${Math.floor((sum / total) * 100)}% reviewed` : undefined;
+      if (treeView.description !== description) {
+        treeView.description = description;
       }
-      treeView.description = total ? `${Math.floor((sum / total) * 100)}% reviewed` : undefined;
     }),
   );
 
   // ------------------------------------------------------------ events
+  // File events are triaged by the tracker: most of them (saves, build output,
+  // ignored files) don't need a git refresh. See Tracker.onFileEvent.
   const watcher = vscode.workspace.createFileSystemWatcher('**/*');
   context.subscriptions.push(
     watcher,
-    watcher.onDidCreate(() => t.scheduleRefresh(1500)),
-    watcher.onDidDelete(() => t.scheduleRefresh(1500)),
-    watcher.onDidChange(() => t.scheduleRefresh(1500)),
+    watcher.onDidCreate((uri) => t.onFileEvent(uri, 'create')),
+    watcher.onDidDelete((uri) => t.onFileEvent(uri, 'delete')),
+    watcher.onDidChange((uri) => t.onFileEvent(uri, 'change')),
     vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document.uri.scheme === 'file') {
         t.onDocumentChanged(e);
       }
     }),
+    // On save, scores of lines that no longer exist are dropped, and a file that
+    // was not part of the diff yet is offered to the tracker (the watcher
+    // usually reports it too; duplicates are merged).
     vscode.workspace.onDidSaveTextDocument((doc) => {
       t.pruneDocument(doc);
-      t.scheduleRefresh(500);
+      if (doc.uri.scheme === 'file') {
+        t.onFileEvent(doc.uri, 'change');
+      }
     }),
     vscode.workspace.onDidCloseTextDocument((doc) => t.forgetDocument(doc)),
-    vscode.workspace.onDidChangeWorkspaceFolders(() => t.scheduleRefresh(100)),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => t.workspaceFoldersChanged()),
     vscode.window.onDidChangeWindowState((s) => {
       if (s.focused) {
         t.scheduleRefresh(300); // catch commits / AI edits made outside VS Code

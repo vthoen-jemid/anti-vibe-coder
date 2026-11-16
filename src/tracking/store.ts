@@ -6,7 +6,15 @@ type Serialized = Record<string, Record<string, number>>;
 
 /**
  * Review scores, persisted per (repo, branch) in workspaceState.
- * Kept in memory and flushed with a debounce.
+ * Kept in memory and flushed with a debounce (3 s) and on dispose/deactivate.
+ *
+ * Storage format (see docs/ARCHITECTURE.md, "Persistence"):
+ *
+ *     key:   "antiVibe.v1:<normRoot>::<branch>"        (normRoot lower-cased on Windows)
+ *     value: { "<repo-relative path>": { "<lineKey>": score } }
+ *
+ * Scores are rounded to 3 decimals; files without scores are left out, and a
+ * branch without any scores is stored as `undefined` (removed).
  */
 export class ReviewStore implements vscode.Disposable {
   private data = new Map<string, Map<string, ScoreMap>>();

@@ -9,6 +9,16 @@
     },
     {
       "type": "npm",
+      "script": "package",
+      "label": "npm: package (vsix)",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "type": "npm",
       "script": "watch",
       "isBackground": true,
       "problemMatcher": "$esbuild-watch"

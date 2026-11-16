@@ -63,6 +63,12 @@ export class SignalCollector implements vscode.Disposable {
     return Date.now() - this.lastActivity > this.tracker.config.idleTimeoutSeconds * 1000;
   }
 
+  /**
+   * Once per second: collects viewport, cursor and selection increments for
+   * every visible editor of a tracked file and applies them per document in a
+   * single `bumpMany` (one score update and one repaint per document).
+   * Skipped entirely while the window is unfocused or the user is idle.
+   */
   private tick(): void {
     if (!vscode.window.state.focused || this.isIdle()) {
       return;

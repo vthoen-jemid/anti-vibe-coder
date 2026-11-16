@@ -74,7 +74,25 @@ function steps(segments: [number, number, number][]): number[] {
 const SEC_STEPS = steps([[1, 10, 0.5], [10, 30, 1], [30, 60, 2], [60, 120, 5], [120, 300, 10], [300, 600, 30], [600, 1200, 60]]);
 const COUNT_STEPS = steps([[1, 20, 1], [20, 50, 2], [50, 100, 5]]);
 
-/** Collapsible "Settings" block in the sidebar to tune signals, thresholds and colours. */
+/**
+ * Collapsible "Settings" block in the sidebar to tune signals, thresholds and colours.
+ *
+ * Message protocol between the extension and the webview:
+ *
+ * extension → webview
+ * - `{ type: 'values', values }`       current shareable settings (on ready, on config change)
+ * - `{ type: 'repos', repos }`         per repo: id, name, branch, baseRef, own base, fallback, error
+ *                                      (sent only when it changed, or when the view becomes visible)
+ * - `{ type: 'branches', id, list }`   branch list for one repo's "Compare against" field
+ * - `{ type: 'baseError', id, message }` the typed base ref doesn't exist
+ *
+ * webview → extension
+ * - `ready`                             the page loaded; send values and repos
+ * - `set` (key, value)                  a setting changed; written to user settings after 300 ms
+ * - `setBase` (id, value)               choose the base for the repo's current branch ('' = default)
+ * - `branches` (id)                     request a repo's branch list
+ * - `reset` | `export` | `import` | `openJson`   the buttons at the bottom
+ */
 export class SettingsViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   private view: vscode.WebviewView | undefined;
   private subs: vscode.Disposable[];
